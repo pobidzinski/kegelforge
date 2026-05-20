@@ -32,7 +32,7 @@ function FirstRunScreen({ onSaved }: { onSaved: () => void }) {
 
     const { error: err } = await supabase
       .from('program_config')
-      .insert({ id: 1, start_date: date })
+      .upsert({ id: 1, start_date: date })
 
     if (err) {
       setError('Nie udało się zapisać. Spróbuj ponownie.')
