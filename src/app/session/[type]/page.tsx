@@ -234,9 +234,29 @@ function RestView({ restSec, onFinish }: { restSec: number; onFinish: () => void
       }
     }, 100)
 
+    async function scheduleNotification() {
+      if (!('serviceWorker' in navigator) || !('Notification' in window)) return
+      if (Notification.permission === 'default') {
+        await Notification.requestPermission()
+      }
+      if (Notification.permission !== 'granted') return
+      const sw = await navigator.serviceWorker.ready
+      sw.active?.postMessage({
+        type: 'SCHEDULE_NOTIFICATION',
+        id: 'rest-timer',
+        endTime: endTimeRef.current,
+        title: 'KegelForge',
+        body: 'Czas odpoczynku minął! Czas na kolejną serię 💪',
+      })
+    }
+    scheduleNotification()
+
     return () => {
       mountedRef.current = false
       if (intervalRef.current) clearInterval(intervalRef.current)
+      navigator.serviceWorker?.ready
+        .then((sw) => sw.active?.postMessage({ type: 'CANCEL_NOTIFICATION', id: 'rest-timer' }))
+        .catch(() => {})
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 

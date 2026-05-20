@@ -88,7 +88,7 @@ function buildExercises(
     const holdSec2 = phase === 1 ? 3 : phase === 2 ? 5 : 8
 
     if (sessionType === 'morning') {
-      return [ex('type2_hold', { sets: 2, holdSec: holdSec2, restSec: 90 })]
+      return [ex('type2_hold', { sets: 2, holdSec: holdSec2, restSec: holdSec2 * 6 })]
     }
     if (sessionType === 'midday') {
       return [ex('type1_endurance', { sets: 2, holdSec, restSec: 90 })]
@@ -104,7 +104,7 @@ function buildExercises(
 
     if (sessionType === 'morning') {
       return [
-        ex('type2_hold', { sets: 3, holdSec: 3, restSec: 90 }),
+        ex('type2_hold', { sets: 3, holdSec: 3, restSec: 18 }),
         ex('power_flutter', { sets: 2, reps: 10, restSec: 60 }),
       ]
     }
@@ -120,7 +120,7 @@ function buildExercises(
       ),
       ex(
         'power_flutter',
-        { sets: 2, reps: 20, restSec: 60 },
+        { sets: 2, reps: 20, restSec: 120 },
         'Szybkie rytmiczne spięcia 1 na sekundę bez pauzy.',
       ),
     ]
@@ -133,7 +133,7 @@ function buildExercises(
 
     if (sessionType === 'morning') {
       return [
-        ex('type2_hold', { sets: 4, holdSec: 5, restSec: 90 }),
+        ex('type2_hold', { sets: 4, holdSec: 5, restSec: 30 }),
         ex('power_flutter', { sets: 3, reps: 10, restSec: 60 }),
       ]
     }
@@ -149,7 +149,7 @@ function buildExercises(
       ),
       ex(
         'power_flutter',
-        { sets: 3, reps: 20, restSec: 60 },
+        { sets: 3, reps: 20, restSec: 120 },
         'Szybkie rytmiczne spięcia 1 na sekundę bez pauzy.',
       ),
     ]
@@ -161,7 +161,7 @@ function buildExercises(
 
   if (sessionType === 'morning') {
     return [
-      ex('type2_hold', { sets: 4, holdSec: 8, restSec: 90 }),
+      ex('type2_hold', { sets: 4, holdSec: 8, restSec: 48 }),
       ex('power_flutter', { sets: 3, reps: 10, restSec: 60 }),
     ]
   }
@@ -177,7 +177,7 @@ function buildExercises(
     ),
     ex(
       'power_flutter',
-      { sets: 3, reps: 25, restSec: 60 },
+      { sets: 3, reps: 25, restSec: 150 },
       'Szybkie rytmiczne spięcia 1 na sekundę bez pauzy.',
     ),
   ]
