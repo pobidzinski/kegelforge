@@ -489,7 +489,11 @@ export default function SessionPage() {
         })
         .select('id').single()
 
-      if (error || !session) { router.replace('/summary'); return }
+      if (error || !session) {
+        console.error('Błąd zapisu sesji:', error?.message, error?.details)
+        router.replace('/summary')
+        return
+      }
 
       if (store.completedSets.length > 0) {
         await supabase.from('sets').insert(
