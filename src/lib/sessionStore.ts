@@ -1,11 +1,11 @@
 import { create } from 'zustand'
-import type { ExerciseType } from './program'
 
 export interface CompletedSet {
-  exerciseKey: ExerciseType
+  exerciseKey: string
   setNumber: number
   reps?: number
   holdSec?: number
+  muscleTarget?: string
   completed: boolean
 }
 

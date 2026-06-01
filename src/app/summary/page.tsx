@@ -26,12 +26,26 @@ interface SetRow {
 }
 
 const EXERCISE_NAMES: Record<string, string> = {
+  // new
+  quick_flicks: 'Quick Flicks — eksplozja IC+BS',
+  iso_hold_ic: 'Izometria eksplozywna IC',
+  iso_hold_ic_lunge: 'Izometria IC — pozycja wykroku',
+  endurance_hold_bs: 'Wytrzymałość BS — długie trzymanie',
+  endurance_hold_bs_standing: 'Wytrzymałość BS — pozycja stojąca',
+  reverse_kegel: 'Reverse Kegel — downtraining',
+  bs_isolation: 'Izolacja BS bez IC i PC',
+  squat_integration: 'Integracja w przysiadzie',
+  squat_integration_dynamic: 'Integracja dynamiczna — przysiad do stania',
+  // legacy
   type2_hold: 'Spięcia z trzymaniem (Typ II)',
   power_flutter: 'Szybkie uderzenia (Power)',
   type1_endurance: 'Długie trzymanie (Typ I)',
 }
 
 const SESSION_LABELS: Record<string, string> = {
+  session_a: 'Sesja A · Siła i eksplozja',
+  session_b: 'Sesja B · Wytrzymałość',
+  session_c: 'Sesja C · Integracja',
   morning: 'Rano',
   midday: 'Południe',
   evening: 'Wieczór',

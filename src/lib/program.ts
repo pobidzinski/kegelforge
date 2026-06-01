@@ -1,184 +1,378 @@
-export type ExerciseType = 'type2_hold' | 'power_flutter' | 'type1_endurance'
+import { EXERCISES } from './exercises'
+
+export type SessionType = 'session_a' | 'session_b' | 'session_c'
+
+export interface ExercisePhase {
+  type: 'reps' | 'hold'
+  reps: number
+  holdSec?: number
+}
 
 export interface Exercise {
-  key: ExerciseType
+  key: string
   name: string
   description: string
   sets: number
-  reps?: number
-  holdSec?: number
   restSec: number
+  muscleTarget: string
+  // RepsView
+  reps?: number
+  // RepTimedView (N reps each M seconds per set)
+  repReps?: number
+  repHoldSec?: number
+  // MixedView
+  phases?: ExercisePhase[]
 }
 
 export interface SessionPlan {
-  sessionType: 'morning' | 'midday' | 'evening'
+  sessionType: SessionType
   exercises: Exercise[]
 }
 
+export type ProgramStatus = 'active' | 'completed'
+
 export interface ProgramState {
+  status: ProgramStatus
+  cycle: 1 | 2
   phase: 1 | 2 | 3
   weekInPhase: 1 | 2 | 3 | 4
   weekOverall: number
   isDeload: boolean
 }
 
-export function getProgramState(startDate: Date): ProgramState {
-  const now = new Date()
-  const msPerWeek = 7 * 24 * 60 * 60 * 1000
-  const weekOverall = Math.floor((now.getTime() - startDate.getTime()) / msPerWeek) + 1
+export function getProgramState(startDate: Date, today: Date = new Date()): ProgramState {
+  const msPerDay = 24 * 60 * 60 * 1000
+  const totalDays = Math.floor((today.getTime() - startDate.getTime()) / msPerDay)
+  const weekOverall = Math.floor(totalDays / 7) + 1
 
-  const cycleWeek = ((weekOverall - 1) % 12) + 1
-  const phase = cycleWeek <= 4 ? 1 : cycleWeek <= 8 ? 2 : 3
-  const weekInPhase = (((weekOverall - 1) % 4) + 1) as 1 | 2 | 3 | 4
+  if (weekOverall > 24) {
+    return {
+      status: 'completed',
+      cycle: 2,
+      phase: 3,
+      weekInPhase: 4,
+      weekOverall: 24,
+      isDeload: true,
+    }
+  }
+
+  const cycle: 1 | 2 = weekOverall <= 12 ? 1 : 2
+  const weekInCycle = cycle === 1 ? weekOverall : weekOverall - 12
+  const phase = Math.ceil(weekInCycle / 4) as 1 | 2 | 3
+  const weekInPhase = (((weekInCycle - 1) % 4) + 1) as 1 | 2 | 3 | 4
   const isDeload = weekInPhase === 4
 
-  return { phase: phase as 1 | 2 | 3, weekInPhase, weekOverall, isDeload }
-}
-
-const NAMES: Record<ExerciseType, { name: string; description: string }> = {
-  type2_hold: {
-    name: 'Spięcia z trzymaniem (Typ II)',
-    description:
-      '100% napięcia. Pełny relaks 5 sek. po każdym powtórzeniu. Bez kompensacji brzucha i pośladków.',
-  },
-  power_flutter: {
-    name: 'Szybkie uderzenia (Power)',
-    description: 'Maksymalny skurcz → pełny luz. Tempo 1-0-1.',
-  },
-  type1_endurance: {
-    name: 'Długie trzymanie (Typ I)',
-    description: '65-70% napięcia. Równomierny oddech przez cały czas. Bez kompensacji.',
-  },
+  return { status: 'active', cycle, phase, weekInPhase, weekOverall, isDeload }
 }
 
 function ex(
-  key: ExerciseType,
-  overrides: Partial<Omit<Exercise, 'key' | 'name' | 'description'>>,
-  descriptionOverride?: string,
+  key: string,
+  params: {
+    sets: number
+    restSec: number
+    reps?: number
+    repReps?: number
+    repHoldSec?: number
+    phases?: ExercisePhase[]
+  },
 ): Exercise {
+  const def = EXERCISES.find((e) => e.key === key)
+  if (!def) throw new Error(`Exercise ${key} not found`)
   return {
     key,
-    name: NAMES[key].name,
-    description: descriptionOverride ?? NAMES[key].description,
-    sets: overrides.sets!,
-    reps: overrides.reps,
-    holdSec: overrides.holdSec,
-    restSec: overrides.restSec!,
+    name: def.name,
+    description: def.cue,
+    sets: params.sets,
+    restSec: params.restSec,
+    muscleTarget: def.muscle_target,
+    reps: params.reps,
+    repReps: params.repReps,
+    repHoldSec: params.repHoldSec,
+    phases: params.phases,
   }
 }
 
-export function getSessionPlan(
-  sessionType: 'morning' | 'midday' | 'evening',
-  state: ProgramState,
-): SessionPlan {
-  const { phase, weekInPhase, isDeload } = state
-  const exercises = buildExercises(sessionType, phase, weekInPhase, isDeload)
+// ─── Cycle 1 ──────────────────────────────────────────────────────────────────
+
+function c1SessionA(phase: 1 | 2 | 3, isDeload: boolean): Exercise[] {
+  if (isDeload) {
+    if (phase === 1 || phase === 2) {
+      return [
+        ex('quick_flicks',  { sets: 2, reps: 10, restSec: 90 }),
+        ex('reverse_kegel', { sets: 3, reps: 8, restSec: 45 }),
+      ]
+    }
+    // phase 3 deload
+    return [
+      ex('quick_flicks',  { sets: 2, reps: 10, restSec: 90 }),
+      ex('iso_hold_ic',   { sets: 2, repReps: 6, repHoldSec: 4, restSec: 120 }),
+      ex('reverse_kegel', { sets: 2, reps: 8, restSec: 45 }),
+    ]
+  }
+
+  if (phase === 1) {
+    return [
+      ex('quick_flicks',  { sets: 4, reps: 10, restSec: 90 }),
+      ex('iso_hold_ic',   { sets: 3, repReps: 6, repHoldSec: 3, restSec: 120 }),
+      ex('reverse_kegel', { sets: 2, reps: 8, restSec: 45 }),
+    ]
+  }
+  if (phase === 2) {
+    return [
+      ex('quick_flicks',  { sets: 4, reps: 10, restSec: 60 }),
+      ex('iso_hold_ic',   { sets: 3, repReps: 6, repHoldSec: 5, restSec: 120 }),
+      ex('iso_hold_ic',   { sets: 2, repReps: 4, repHoldSec: 5, restSec: 120 }),
+      ex('reverse_kegel', { sets: 2, reps: 8, restSec: 45 }),
+    ]
+  }
+  // phase 3
+  return [
+    ex('quick_flicks',  { sets: 4, reps: 10, restSec: 60 }),
+    ex('iso_hold_ic',   { sets: 4, repReps: 6, repHoldSec: 6, restSec: 120 }),
+    ex('reverse_kegel', { sets: 3, reps: 8, restSec: 45 }),
+  ]
+}
+
+function c1SessionB(phase: 1 | 2 | 3, isDeload: boolean): Exercise[] {
+  if (isDeload) {
+    if (phase === 1) {
+      return [
+        ex('endurance_hold_bs', { sets: 2, repReps: 6, repHoldSec: 10, restSec: 60 }),
+        ex('reverse_kegel',     { sets: 2, reps: 8, restSec: 45 }),
+      ]
+    }
+    if (phase === 2) {
+      return [
+        ex('endurance_hold_bs', { sets: 2, repReps: 6, repHoldSec: 15, restSec: 60 }),
+        ex('reverse_kegel',     { sets: 2, reps: 8, restSec: 45 }),
+      ]
+    }
+    // phase 3 deload
+    return [
+      ex('endurance_hold_bs', { sets: 2, repReps: 6, repHoldSec: 20, restSec: 60 }),
+      ex('reverse_kegel',     { sets: 2, reps: 8, restSec: 45 }),
+    ]
+  }
+
+  if (phase === 1) {
+    return [
+      ex('endurance_hold_bs', { sets: 3, repReps: 8, repHoldSec: 10, restSec: 60 }),
+      ex('reverse_kegel',     { sets: 3, reps: 8, restSec: 45 }),
+    ]
+  }
+  if (phase === 2) {
+    return [
+      ex('endurance_hold_bs', { sets: 3, repReps: 8, repHoldSec: 20, restSec: 60 }),
+      ex('reverse_kegel',     { sets: 3, reps: 8, restSec: 45 }),
+    ]
+  }
+  // phase 3
+  return [
+    ex('endurance_hold_bs', { sets: 3, repReps: 8, repHoldSec: 30, restSec: 60 }),
+    ex('reverse_kegel',     { sets: 3, reps: 8, restSec: 45 }),
+  ]
+}
+
+const SQUAT_PHASES: ExercisePhase[] = [
+  { type: 'reps', reps: 5 },
+  { type: 'hold', reps: 5, holdSec: 5 },
+]
+
+function c1SessionC(phase: 1 | 2 | 3, isDeload: boolean): Exercise[] {
+  if (isDeload) {
+    if (phase === 1 || phase === 2) {
+      return [
+        ex('bs_isolation',  { sets: 2, repReps: 8, repHoldSec: 3, restSec: 60 }),
+        ex('reverse_kegel', { sets: 2, reps: 8, restSec: 45 }),
+      ]
+    }
+    // phase 3 deload
+    return [
+      ex('squat_integration', { sets: 2, phases: SQUAT_PHASES, restSec: 90 }),
+      ex('reverse_kegel',     { sets: 3, reps: 8, restSec: 45 }),
+    ]
+  }
+
+  if (phase === 1) {
+    return [
+      ex('bs_isolation',  { sets: 3, repReps: 10, repHoldSec: 3, restSec: 60 }),
+      ex('reverse_kegel', { sets: 3, reps: 8, restSec: 45 }),
+    ]
+  }
+  if (phase === 2) {
+    return [
+      ex('squat_integration', { sets: 3, phases: SQUAT_PHASES, restSec: 90 }),
+      ex('bs_isolation',      { sets: 3, repReps: 10, repHoldSec: 3, restSec: 60 }),
+      ex('reverse_kegel',     { sets: 2, reps: 8, restSec: 45 }),
+    ]
+  }
+  // phase 3
+  return [
+    ex('squat_integration', { sets: 4, phases: SQUAT_PHASES, restSec: 90 }),
+    ex('bs_isolation',      { sets: 3, repReps: 10, repHoldSec: 5, restSec: 60 }),
+    ex('reverse_kegel',     { sets: 3, reps: 8, restSec: 45 }),
+  ]
+}
+
+// ─── Cycle 2 ──────────────────────────────────────────────────────────────────
+
+function c2SessionA(phase: 1 | 2 | 3, isDeload: boolean): Exercise[] {
+  if (isDeload) {
+    if (phase === 1) {
+      return [
+        ex('quick_flicks',  { sets: 2, reps: 10, restSec: 90 }),
+        ex('iso_hold_ic',   { sets: 2, repReps: 6, repHoldSec: 4, restSec: 120 }),
+        ex('reverse_kegel', { sets: 3, reps: 8, restSec: 45 }),
+      ]
+    }
+    if (phase === 2) {
+      return [
+        ex('quick_flicks',      { sets: 2, reps: 10, restSec: 90 }),
+        ex('iso_hold_ic_lunge', { sets: 2, repReps: 4, repHoldSec: 5, restSec: 120 }),
+        ex('reverse_kegel',     { sets: 3, reps: 8, restSec: 45 }),
+      ]
+    }
+    // phase 3 deload
+    return [
+      ex('quick_flicks',  { sets: 2, reps: 10, restSec: 90 }),
+      ex('iso_hold_ic',   { sets: 2, repReps: 6, repHoldSec: 6, restSec: 120 }),
+      ex('reverse_kegel', { sets: 3, reps: 8, restSec: 45 }),
+    ]
+  }
+
+  if (phase === 1) {
+    return [
+      ex('quick_flicks',      { sets: 4, reps: 10, restSec: 45 }),
+      ex('iso_hold_ic',       { sets: 4, repReps: 6, repHoldSec: 6, restSec: 120 }),
+      ex('iso_hold_ic_lunge', { sets: 2, repReps: 4, repHoldSec: 5, restSec: 120 }),
+      ex('reverse_kegel',     { sets: 3, reps: 8, restSec: 45 }),
+    ]
+  }
+  if (phase === 2) {
+    return [
+      ex('quick_flicks',      { sets: 4, reps: 12, restSec: 45 }),
+      ex('iso_hold_ic',       { sets: 4, repReps: 6, repHoldSec: 8, restSec: 120 }),
+      ex('iso_hold_ic_lunge', { sets: 3, repReps: 5, repHoldSec: 6, restSec: 120 }),
+      ex('reverse_kegel',     { sets: 3, reps: 8, restSec: 45 }),
+    ]
+  }
+  // phase 3
+  return [
+    ex('quick_flicks',      { sets: 5, reps: 12, restSec: 45 }),
+    ex('iso_hold_ic',       { sets: 4, repReps: 6, repHoldSec: 10, restSec: 120 }),
+    ex('iso_hold_ic_lunge', { sets: 3, repReps: 6, repHoldSec: 8, restSec: 120 }),
+    ex('reverse_kegel',     { sets: 3, reps: 10, restSec: 45 }),
+  ]
+}
+
+function c2SessionB(phase: 1 | 2 | 3, isDeload: boolean): Exercise[] {
+  if (isDeload) {
+    // All deloads for C2 use seated version
+    const holdSec = phase === 1 ? 20 : phase === 2 ? 30 : 40
+    return [
+      ex('endurance_hold_bs', { sets: 2, repReps: 6, repHoldSec: holdSec, restSec: 60 }),
+      ex('reverse_kegel',     { sets: 2, reps: 8, restSec: 45 }),
+    ]
+  }
+
+  if (phase === 1) {
+    return [
+      ex('endurance_hold_bs_standing', { sets: 3, repReps: 8, repHoldSec: 30, restSec: 60 }),
+      ex('reverse_kegel',              { sets: 3, reps: 10, restSec: 45 }),
+    ]
+  }
+  if (phase === 2) {
+    return [
+      ex('endurance_hold_bs_standing', { sets: 3, repReps: 8, repHoldSec: 45, restSec: 60 }),
+      ex('reverse_kegel',              { sets: 3, reps: 10, restSec: 45 }),
+    ]
+  }
+  // phase 3
+  return [
+    ex('endurance_hold_bs_standing', { sets: 3, repReps: 8, repHoldSec: 60, restSec: 60 }),
+    ex('reverse_kegel',              { sets: 4, reps: 10, restSec: 45 }),
+  ]
+}
+
+function c2SessionC(phase: 1 | 2 | 3, isDeload: boolean): Exercise[] {
+  if (isDeload) {
+    if (phase === 1) {
+      return [
+        ex('squat_integration', { sets: 2, phases: SQUAT_PHASES, restSec: 90 }),
+        ex('bs_isolation',      { sets: 2, repReps: 8, repHoldSec: 5, restSec: 60 }),
+        ex('reverse_kegel',     { sets: 3, reps: 8, restSec: 45 }),
+      ]
+    }
+    if (phase === 2) {
+      return [
+        ex('squat_integration', { sets: 2, phases: SQUAT_PHASES, restSec: 90 }),
+        ex('reverse_kegel',     { sets: 3, reps: 8, restSec: 45 }),
+      ]
+    }
+    // phase 3 deload
+    return [
+      ex('squat_integration_dynamic', { sets: 2, reps: 8, restSec: 90 }),
+      ex('bs_isolation',              { sets: 2, repReps: 8, repHoldSec: 8, restSec: 60 }),
+      ex('reverse_kegel',             { sets: 3, reps: 8, restSec: 45 }),
+    ]
+  }
+
+  if (phase === 1) {
+    return [
+      ex('squat_integration_dynamic', { sets: 3, reps: 8, restSec: 90 }),
+      ex('bs_isolation',              { sets: 3, repReps: 10, repHoldSec: 5, restSec: 60 }),
+      ex('reverse_kegel',             { sets: 3, reps: 8, restSec: 45 }),
+    ]
+  }
+  if (phase === 2) {
+    return [
+      ex('squat_integration_dynamic', { sets: 4, reps: 10, restSec: 90 }),
+      ex('bs_isolation',              { sets: 3, repReps: 10, repHoldSec: 8, restSec: 60 }),
+      ex('reverse_kegel',             { sets: 3, reps: 8, restSec: 45 }),
+    ]
+  }
+  // phase 3
+  return [
+    ex('squat_integration_dynamic', { sets: 4, reps: 12, restSec: 90 }),
+    ex('bs_isolation',              { sets: 4, repReps: 10, repHoldSec: 10, restSec: 60 }),
+    ex('reverse_kegel',             { sets: 4, reps: 10, restSec: 45 }),
+  ]
+}
+
+// ─── Public API ───────────────────────────────────────────────────────────────
+
+export function getSessionPlan(sessionType: SessionType, state: ProgramState): SessionPlan {
+  if (state.status === 'completed') return { sessionType, exercises: [] }
+
+  const { cycle, phase, isDeload } = state
+  let exercises: Exercise[]
+
+  if (cycle === 1) {
+    if (sessionType === 'session_a') exercises = c1SessionA(phase, isDeload)
+    else if (sessionType === 'session_b') exercises = c1SessionB(phase, isDeload)
+    else exercises = c1SessionC(phase, isDeload)
+  } else {
+    if (sessionType === 'session_a') exercises = c2SessionA(phase, isDeload)
+    else if (sessionType === 'session_b') exercises = c2SessionB(phase, isDeload)
+    else exercises = c2SessionC(phase, isDeload)
+  }
+
   return { sessionType, exercises }
 }
 
-function buildExercises(
-  sessionType: 'morning' | 'midday' | 'evening',
-  phase: 1 | 2 | 3,
-  weekInPhase: 1 | 2 | 3 | 4,
-  isDeload: boolean,
-): Exercise[] {
-  // ── DELOAD (weekInPhase === 4) ──────────────────────────────────────────────
-  if (isDeload) {
-    const holdSec = phase === 1 ? 45 : phase === 2 ? 60 : 75
-    const holdSec2 = phase === 1 ? 3 : phase === 2 ? 5 : 8
-
-    if (sessionType === 'morning') {
-      return [ex('type2_hold', { sets: 2, holdSec: holdSec2, restSec: holdSec2 * 6 })]
+export function estimateDurationSec(exercises: Exercise[]): number {
+  return exercises.reduce((total, ex) => {
+    let setWorkSec = 0
+    if (ex.reps !== undefined) {
+      setWorkSec = ex.reps * 3  // ~3s per rep
+    } else if (ex.repReps !== undefined && ex.repHoldSec !== undefined) {
+      setWorkSec = ex.repReps * (ex.repHoldSec + 3)  // hold + short pause
+    } else if (ex.phases) {
+      setWorkSec = ex.phases.reduce((s, p) => {
+        if (p.type === 'reps') return s + p.reps * 3
+        return s + p.reps * ((p.holdSec ?? 5) + 3)
+      }, 0)
     }
-    if (sessionType === 'midday') {
-      return [ex('type1_endurance', { sets: 2, holdSec, restSec: 90 })]
-    }
-    // evening
-    return [ex('type1_endurance', { sets: 2, holdSec, restSec: 90 })]
-  }
-
-  // ── PHASE 1 ─────────────────────────────────────────────────────────────────
-  if (phase === 1) {
-    const isProgressed = weekInPhase >= 3
-    const enduranceHold = isProgressed ? 50 : 45
-
-    if (sessionType === 'morning') {
-      return [
-        ex('type2_hold', { sets: 3, holdSec: 3, restSec: 18 }),
-        ex('power_flutter', { sets: 2, reps: 10, restSec: 60 }),
-      ]
-    }
-    if (sessionType === 'midday') {
-      return [ex('type1_endurance', { sets: 3, holdSec: enduranceHold, restSec: 90 })]
-    }
-    // evening
-    return [
-      ex(
-        'type1_endurance',
-        { sets: 3, holdSec: enduranceHold, restSec: 90 },
-        'Drugi blok wytrzymałości – kluczowy dla tonusu spoczynkowego.',
-      ),
-      ex(
-        'power_flutter',
-        { sets: 2, reps: 20, restSec: 120 },
-        'Szybkie rytmiczne spięcia 1 na sekundę bez pauzy.',
-      ),
-    ]
-  }
-
-  // ── PHASE 2 ─────────────────────────────────────────────────────────────────
-  if (phase === 2) {
-    const isProgressed = weekInPhase >= 3
-    const enduranceHold = isProgressed ? 65 : 60
-
-    if (sessionType === 'morning') {
-      return [
-        ex('type2_hold', { sets: 4, holdSec: 5, restSec: 30 }),
-        ex('power_flutter', { sets: 3, reps: 10, restSec: 60 }),
-      ]
-    }
-    if (sessionType === 'midday') {
-      return [ex('type1_endurance', { sets: 3, holdSec: enduranceHold, restSec: 90 })]
-    }
-    // evening
-    return [
-      ex(
-        'type1_endurance',
-        { sets: 3, holdSec: enduranceHold, restSec: 90 },
-        'Drugi blok wytrzymałości – kluczowy dla tonusu spoczynkowego.',
-      ),
-      ex(
-        'power_flutter',
-        { sets: 3, reps: 20, restSec: 120 },
-        'Szybkie rytmiczne spięcia 1 na sekundę bez pauzy.',
-      ),
-    ]
-  }
-
-  // ── PHASE 3 ─────────────────────────────────────────────────────────────────
-  const isProgressed = weekInPhase >= 3
-  const enduranceHold = isProgressed ? 90 : 75
-
-  if (sessionType === 'morning') {
-    return [
-      ex('type2_hold', { sets: 4, holdSec: 8, restSec: 48 }),
-      ex('power_flutter', { sets: 3, reps: 10, restSec: 60 }),
-    ]
-  }
-  if (sessionType === 'midday') {
-    return [ex('type1_endurance', { sets: 3, holdSec: enduranceHold, restSec: 90 })]
-  }
-  // evening
-  return [
-    ex(
-      'type1_endurance',
-      { sets: 3, holdSec: enduranceHold, restSec: 90 },
-      'Drugi blok wytrzymałości – kluczowy dla tonusu spoczynkowego.',
-    ),
-    ex(
-      'power_flutter',
-      { sets: 3, reps: 25, restSec: 150 },
-      'Szybkie rytmiczne spięcia 1 na sekundę bez pauzy.',
-    ),
-  ]
+    return total + ex.sets * (setWorkSec + ex.restSec)
+  }, 0)
 }
