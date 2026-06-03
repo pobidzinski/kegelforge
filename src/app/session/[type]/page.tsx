@@ -611,7 +611,13 @@ export default function SessionPage() {
       muscleTarget: currentExercise.muscleTarget,
       completed: true,
     })
-    store.goToRest()
+    const isLastSet = store.currentSetIndex + 1 >= currentExercise.sets
+    const isLastExercise = store.currentExerciseIndex + 1 >= totalExercises
+    if (isLastSet && isLastExercise) {
+      store.advanceSet(currentExercise.sets, totalExercises)
+    } else {
+      store.goToRest()
+    }
   }
 
   const isMixed = !!currentExercise.phases
