@@ -20,6 +20,7 @@ export interface Exercise {
   // RepTimedView (N reps each M seconds per set)
   repReps?: number
   repHoldSec?: number
+  repRestSec?: number
   // MixedView
   phases?: ExercisePhase[]
 }
@@ -73,6 +74,7 @@ function ex(
     reps?: number
     repReps?: number
     repHoldSec?: number
+    repRestSec?: number
     phases?: ExercisePhase[]
   },
 ): Exercise {
@@ -88,6 +90,7 @@ function ex(
     reps: params.reps,
     repReps: params.repReps,
     repHoldSec: params.repHoldSec,
+    repRestSec: params.repRestSec,
     phases: params.phases,
   }
 }
@@ -137,38 +140,38 @@ function c1SessionB(phase: 1 | 2 | 3, isDeload: boolean): Exercise[] {
   if (isDeload) {
     if (phase === 1) {
       return [
-        ex('endurance_hold_bs', { sets: 2, repReps: 6, repHoldSec: 10, restSec: 60 }),
+        ex('endurance_hold_bs', { sets: 2, repReps: 6, repHoldSec: 10, repRestSec: 5, restSec: 60 }),
         ex('reverse_kegel',     { sets: 2, reps: 8, restSec: 45 }),
       ]
     }
     if (phase === 2) {
       return [
-        ex('endurance_hold_bs', { sets: 2, repReps: 6, repHoldSec: 15, restSec: 60 }),
+        ex('endurance_hold_bs', { sets: 2, repReps: 6, repHoldSec: 15, repRestSec: 5, restSec: 60 }),
         ex('reverse_kegel',     { sets: 2, reps: 8, restSec: 45 }),
       ]
     }
     // phase 3 deload
     return [
-      ex('endurance_hold_bs', { sets: 2, repReps: 6, repHoldSec: 20, restSec: 60 }),
+      ex('endurance_hold_bs', { sets: 2, repReps: 6, repHoldSec: 20, repRestSec: 5, restSec: 60 }),
       ex('reverse_kegel',     { sets: 2, reps: 8, restSec: 45 }),
     ]
   }
 
   if (phase === 1) {
     return [
-      ex('endurance_hold_bs', { sets: 3, repReps: 8, repHoldSec: 10, restSec: 60 }),
+      ex('endurance_hold_bs', { sets: 3, repReps: 8, repHoldSec: 10, repRestSec: 5, restSec: 60 }),
       ex('reverse_kegel',     { sets: 3, reps: 8, restSec: 45 }),
     ]
   }
   if (phase === 2) {
     return [
-      ex('endurance_hold_bs', { sets: 3, repReps: 8, repHoldSec: 20, restSec: 60 }),
+      ex('endurance_hold_bs', { sets: 3, repReps: 8, repHoldSec: 20, repRestSec: 5, restSec: 60 }),
       ex('reverse_kegel',     { sets: 3, reps: 8, restSec: 45 }),
     ]
   }
   // phase 3
   return [
-    ex('endurance_hold_bs', { sets: 3, repReps: 8, repHoldSec: 30, restSec: 60 }),
+    ex('endurance_hold_bs', { sets: 3, repReps: 8, repHoldSec: 30, repRestSec: 5, restSec: 60 }),
     ex('reverse_kegel',     { sets: 3, reps: 8, restSec: 45 }),
   ]
 }
@@ -270,26 +273,26 @@ function c2SessionB(phase: 1 | 2 | 3, isDeload: boolean): Exercise[] {
     // All deloads for C2 use seated version
     const holdSec = phase === 1 ? 20 : phase === 2 ? 30 : 40
     return [
-      ex('endurance_hold_bs', { sets: 2, repReps: 6, repHoldSec: holdSec, restSec: 60 }),
+      ex('endurance_hold_bs', { sets: 2, repReps: 6, repHoldSec: holdSec, repRestSec: 5, restSec: 60 }),
       ex('reverse_kegel',     { sets: 2, reps: 8, restSec: 45 }),
     ]
   }
 
   if (phase === 1) {
     return [
-      ex('endurance_hold_bs_standing', { sets: 3, repReps: 8, repHoldSec: 30, restSec: 60 }),
+      ex('endurance_hold_bs_standing', { sets: 3, repReps: 8, repHoldSec: 30, repRestSec: 5, restSec: 60 }),
       ex('reverse_kegel',              { sets: 3, reps: 10, restSec: 45 }),
     ]
   }
   if (phase === 2) {
     return [
-      ex('endurance_hold_bs_standing', { sets: 3, repReps: 8, repHoldSec: 45, restSec: 60 }),
+      ex('endurance_hold_bs_standing', { sets: 3, repReps: 8, repHoldSec: 45, repRestSec: 5, restSec: 60 }),
       ex('reverse_kegel',              { sets: 3, reps: 10, restSec: 45 }),
     ]
   }
   // phase 3
   return [
-    ex('endurance_hold_bs_standing', { sets: 3, repReps: 8, repHoldSec: 60, restSec: 60 }),
+    ex('endurance_hold_bs_standing', { sets: 3, repReps: 8, repHoldSec: 60, repRestSec: 5, restSec: 60 }),
     ex('reverse_kegel',              { sets: 4, reps: 10, restSec: 45 }),
   ]
 }
@@ -366,7 +369,7 @@ export function estimateDurationSec(exercises: Exercise[]): number {
     if (ex.reps !== undefined) {
       setWorkSec = ex.reps * 3  // ~3s per rep
     } else if (ex.repReps !== undefined && ex.repHoldSec !== undefined) {
-      setWorkSec = ex.repReps * (ex.repHoldSec + 3)  // hold + short pause
+      setWorkSec = ex.repReps * (ex.repHoldSec + (ex.repRestSec ?? ex.repHoldSec))
     } else if (ex.phases) {
       setWorkSec = ex.phases.reduce((s, p) => {
         if (p.type === 'reps') return s + p.reps * 3

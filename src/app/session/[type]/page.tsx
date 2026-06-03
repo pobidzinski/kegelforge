@@ -22,15 +22,29 @@ import MyofascialNote from '@/components/MyofascialNote'
 const RADIUS = 42
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
-function CircleTimer({ timeLeft, totalTime }: { timeLeft: number; totalTime: number }) {
+function CircleTimer({
+  timeLeft,
+  totalTime,
+  mode = 'empty',
+  color = '#10b981',
+}: {
+  timeLeft: number
+  totalTime: number
+  mode?: 'fill' | 'empty'
+  color?: string
+}) {
   const progress = totalTime > 0 ? timeLeft / totalTime : 0
-  const dashOffset = CIRCUMFERENCE * (1 - progress)
+  // 'fill': circle fills as time passes (dashOffset shrinks from CIRCUMFERENCE → 0)
+  // 'empty': circle empties as time passes (dashOffset grows from 0 → CIRCUMFERENCE)
+  const dashOffset = mode === 'fill'
+    ? CIRCUMFERENCE * progress
+    : CIRCUMFERENCE * (1 - progress)
   return (
     <div className="relative flex items-center justify-center w-60 h-60">
       <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full -rotate-90">
         <circle cx="50" cy="50" r={RADIUS} fill="none" stroke="#27272a" strokeWidth="5" />
         <circle
-          cx="50" cy="50" r={RADIUS} fill="none" stroke="#10b981" strokeWidth="5"
+          cx="50" cy="50" r={RADIUS} fill="none" stroke={color} strokeWidth="5"
           strokeLinecap="round" strokeDasharray={CIRCUMFERENCE} strokeDashoffset={dashOffset}
           style={{ transition: 'stroke-dashoffset 0.15s linear' }}
         />
@@ -146,15 +160,18 @@ function RepsView({
   )
 }
 
-// ─── RepTimed View (N reps × M seconds each) ──────────────────────────────────
+// ─── RepTimed View (N reps × M seconds each, auto-flow with rep rest) ─────────
 
 function RepTimedView({
   exercise, setIndex, onComplete,
 }: { exercise: Exercise; setIndex: number; onComplete: () => void }) {
   const totalReps = exercise.repReps!
   const holdSec = exercise.repHoldSec!
+  const restSec = exercise.repRestSec ?? holdSec
+
+  type Phase = 'idle' | 'exercise' | 'rest'
+  const [phase, setPhase] = useState<Phase>('idle')
   const [repIndex, setRepIndex] = useState(0)
-  const [started, setStarted] = useState(false)
   const [timeLeft, setTimeLeft] = useState(holdSec)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const endTimeRef = useRef(0)
@@ -184,6 +201,52 @@ function RepTimedView({
     } catch {}
   }
 
+  const startTimer = (durationSec: number, onExpire: () => void) => {
+    if (intervalRef.current) clearInterval(intervalRef.current)
+    endTimeRef.current = Date.now() + durationSec * 1000
+    doneRef.current = false
+    setTimeLeft(durationSec)
+    intervalRef.current = setInterval(() => {
+      const remaining = Math.ceil((endTimeRef.current - Date.now()) / 1000)
+      if (remaining <= 0) {
+        clearInterval(intervalRef.current!); intervalRef.current = null
+        setTimeLeft(0)
+        if (!doneRef.current) { doneRef.current = true; onExpire() }
+      } else {
+        setTimeLeft(remaining)
+      }
+    }, 100)
+  }
+
+  const beginExerciseRep = (rep: number) => {
+    setRepIndex(rep)
+    setPhase('exercise')
+    startTimer(holdSec, () => {
+      playBeep()
+      try { navigator.vibrate?.([100, 50, 100]) } catch {}
+      setTimeout(() => {
+        if (!mountedRef.current) return
+        const nextRep = rep + 1
+        if (nextRep >= totalReps) {
+          onComplete()
+        } else {
+          beginRestPhase(nextRep)
+        }
+      }, 400)
+    })
+  }
+
+  const beginRestPhase = (nextRep: number) => {
+    setPhase('rest')
+    startTimer(restSec, () => {
+      playBeep()
+      setTimeout(() => {
+        if (!mountedRef.current) return
+        beginExerciseRep(nextRep)
+      }, 200)
+    })
+  }
+
   const handleStart = () => {
     if (!audioCtxRef.current) {
       try {
@@ -191,35 +254,7 @@ function RepTimedView({
         audioCtxRef.current = new Ctx()
       } catch {}
     }
-    endTimeRef.current = Date.now() + holdSec * 1000
-    doneRef.current = false
-    setStarted(true)
-
-    intervalRef.current = setInterval(() => {
-      const remaining = Math.ceil((endTimeRef.current - Date.now()) / 1000)
-      if (remaining <= 0) {
-        clearInterval(intervalRef.current!); intervalRef.current = null
-        setTimeLeft(0)
-        if (!doneRef.current) {
-          doneRef.current = true
-          playBeep()
-          try { navigator.vibrate?.([100, 50, 100]) } catch {}
-          setTimeout(() => {
-            if (!mountedRef.current) return
-            const nextRep = repIndex + 1
-            if (nextRep >= totalReps) {
-              onComplete()
-            } else {
-              setRepIndex(nextRep)
-              setStarted(false)
-              setTimeLeft(holdSec)
-            }
-          }, 400)
-        }
-      } else {
-        setTimeLeft(remaining)
-      }
-    }, 100)
+    beginExerciseRep(0)
   }
 
   return (
@@ -231,13 +266,15 @@ function RepTimedView({
       <p className="text-zinc-400 text-sm text-center leading-relaxed px-4 mb-4">{exercise.description}</p>
 
       <p className="text-zinc-500 text-sm mb-6">
-        Powtórzenie <span className="text-white font-semibold">{repIndex + 1}</span> / {totalReps}
+        {phase === 'rest' ? (
+          <>Odpoczynek przed powt. <span className="text-amber-400 font-semibold">{repIndex + 2}</span></>
+        ) : (
+          <>Powtórzenie <span className="text-white font-semibold">{repIndex + 1}</span> / {totalReps}</>
+        )}
       </p>
 
       <div className="mb-10">
-        {started ? (
-          <CircleTimer timeLeft={timeLeft} totalTime={holdSec} />
-        ) : (
+        {phase === 'idle' && (
           <div className="relative flex items-center justify-center w-60 h-60">
             <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full -rotate-90">
               <circle cx="50" cy="50" r={RADIUS} fill="none" stroke="#27272a" strokeWidth="5" />
@@ -247,9 +284,15 @@ function RepTimedView({
             <span className="text-5xl font-bold text-zinc-300">{holdSec}s</span>
           </div>
         )}
+        {phase === 'exercise' && (
+          <CircleTimer timeLeft={timeLeft} totalTime={holdSec} mode="fill" color="#10b981" />
+        )}
+        {phase === 'rest' && (
+          <CircleTimer timeLeft={timeLeft} totalTime={restSec} mode="empty" color="#f59e0b" />
+        )}
       </div>
 
-      {!started && (
+      {phase === 'idle' && (
         <button
           onClick={handleStart}
           className="w-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-xl py-5 rounded-2xl transition-colors"
